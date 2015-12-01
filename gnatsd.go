@@ -4,6 +4,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strings"
 
@@ -19,6 +22,7 @@ func main() {
 	var showVersion bool
 	var debugAndTrace bool
 	var configFile string
+	var showTlsHelp bool
 
 	// Parse flags
 	flag.IntVar(&opts.Port, "port", 0, "Port to listen on.")
@@ -52,6 +56,14 @@ func main() {
 	flag.BoolVar(&showVersion, "v", false, "Print version information.")
 	flag.IntVar(&opts.ProfPort, "profile", 0, "Profiling HTTP port")
 	flag.StringVar(&opts.RoutesStr, "routes", "", "Routes to actively solicit a connection.")
+	flag.StringVar(&opts.ClusterListenStr, "cluster_listen", "", "Cluster url from which members can solicit routes.")
+	flag.BoolVar(&showTlsHelp, "help_tls", false, "TLS help.")
+
+	flag.BoolVar(&opts.TLS, "tls", false, "Enable TLS.")
+	flag.BoolVar(&opts.TLSVerify, "tlsverify", false, "Enable TLS with client verification.")
+	flag.StringVar(&opts.TLSCert, "tlscert", "", "Server certificate file.")
+	flag.StringVar(&opts.TLSKey, "tlskey", "", "Private key for server certificate.")
+	flag.StringVar(&opts.TLSCaCert, "tlscacert", "", "Client certificate CA for verification.")
 
 	// Not public per se, will be replaced with dynamic system, but can be used to lower memory footprint when
 	// lots of connections present.
@@ -64,6 +76,10 @@ func main() {
 	// Show version and exit
 	if showVersion {
 		server.PrintServerAndExit()
+	}
+
+	if showTlsHelp {
+		server.PrintTlsHelpAndDie()
 	}
 
 	// One flag can set multiple options.
@@ -97,6 +113,15 @@ func main() {
 		server.PrintAndDie(err.Error())
 	}
 	opts.Routes = newroutes
+
+	// Configure TLS based on any present flags
+	configureTLS(&opts)
+
+	// Configure cluster opts if explicitly set via flags.
+	err = configureClusterOpts(&opts)
+	if err != nil {
+		server.PrintAndDie(err.Error())
+	}
 
 	// Create the server with appropriate options.
 	s := server.New(&opts)
@@ -147,4 +172,60 @@ func configureLogger(s *server.Server, opts *server.Options) {
 	}
 
 	s.SetLogger(log, opts.Debug, opts.Trace)
+}
+
+func configureTLS(opts *server.Options) {
+	// If no trigger flags, ignore the others
+	if !opts.TLS && !opts.TLSVerify {
+		return
+	}
+	if opts.TLSCert == "" {
+		server.PrintAndDie("TLS Server certificate must be present and valid.")
+	}
+	if opts.TLSKey == "" {
+		server.PrintAndDie("TLS Server private key must be present and valid.")
+	}
+
+	tc := server.TLSConfigOpts{}
+	tc.CertFile = opts.TLSCert
+	tc.KeyFile = opts.TLSKey
+	tc.CaFile = opts.TLSCaCert
+
+	if opts.TLSVerify {
+		tc.Verify = true
+	}
+	var err error
+	if opts.TLSConfig, err = server.GenTLSConfig(&tc); err != nil {
+		server.PrintAndDie(err.Error())
+	}
+}
+
+func configureClusterOpts(opts *server.Options) error {
+	if opts.ClusterListenStr == "" {
+		return nil
+	}
+
+	clusterUrl, err := url.Parse(opts.ClusterListenStr)
+	h, p, err := net.SplitHostPort(clusterUrl.Host)
+	if err != nil {
+		return err
+	}
+	opts.ClusterHost = h
+	_, err = fmt.Sscan(p, &opts.ClusterPort)
+	if err != nil {
+		return err
+	}
+
+	if clusterUrl.User != nil {
+		pass, hasPassword := clusterUrl.User.Password()
+		if !hasPassword {
+			return fmt.Errorf("Expected cluster password to be set.")
+		}
+		opts.ClusterPassword = pass
+
+		user := clusterUrl.User.Username()
+		opts.ClusterUsername = user
+	}
+
+	return nil
 }

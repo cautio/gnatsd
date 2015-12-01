@@ -1,6 +1,6 @@
 # gnatsd
 
-[![License][License-Image]][License-Url] [![Build][Build-Status-Image]][Build-Status-Url] [![Release][Release-Image]][Release-Url] [![Coverage][Coverage-Image]][Coverage-Url]
+[![License][License-Image]][License-Url] [![ReportCard][ReportCard-Image]][ReportCard-Url] [![Build][Build-Status-Image]][Build-Status-Url] [![Release][Release-Image]][Release-Url] [![Coverage][Coverage-Image]][Coverage-Url]
 
 A High Performance [NATS](https://nats.io) Server written in [Go.](http://golang.org)
 
@@ -30,6 +30,13 @@ Logging Options:
 Authorization Options:
         --user user                  User required for connections
         --pass password              Password required for connections
+
+TLS Options:
+        --tls                        Enable TLS, do not verify clients (default: false)
+        --tlscert FILE               Server certificate file
+        --tlskey FILE                Private key for server certificate
+        --tlsverify                  Enable TLS, very client certificates
+        --tlscacert FILE             Client certificate CA for verification
 
 Cluster Options:
         --routes [rurl-1, rurl-2]    Routes to solicit and connect
@@ -320,3 +327,5 @@ IN THE SOFTWARE.
 [Release-image]: http://img.shields.io/badge/release-v0.6.8-1eb0fc.svg
 [Coverage-Url]: https://coveralls.io/r/nats-io/gnatsd?branch=master
 [Coverage-image]: https://img.shields.io/coveralls/nats-io/gnatsd.svg
+[ReportCard-Url]: http://goreportcard.com/report/nats-io/gnatsd
+[ReportCard-Image]: http://goreportcard.com/badge/nats-io/gnatsd
